@@ -6,67 +6,44 @@ import L from 'leaflet';
 
 export default function MapViewer() {
   const [eventos, setEventos] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  // ICONO DINÁMICO
-  const getIcon = (categoria) => L.divIcon({
-    html: `<div style="background-color: ${categoria === 'Actividades' ? '#3B82F6' : '#F59E0B'}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.3);"></div>`,
+  // Iconos por categoría
+  const getIcon = (color) => L.divIcon({
+    html: `<div style="background-color: ${color}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.4);"></div>`,
     className: 'custom-marker'
   });
 
   useEffect(() => {
-    const fetchLiveEvents = async () => {
+    // API REAL: Agenda Cultural de Barcelona (Open Data)
+    const fetchBarnaData = async () => {
       try {
-        // Consultamos la Agenda Cultural de Barcelona (API REAL)
-        const response = await fetch('https://opendata-ajuntament.barcelona.cat/data/api/3/action/datastore_search?resource_id=e7041793-6c8c-4f10-9080-33b09228a0f9&limit=50');
-        const data = await response.json();
-        
-        // Mapeamos los datos de la API a nuestro formato
-        const liveEvents = data.result.records.map(item => ({
-          id: item._id,
-          titulo: item.name,
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-          descripcion: item.description,
-          tipo: item.category_name
-        })).filter(e => !isNaN(e.lat));
-
-        setEventos(liveEvents);
-        setLoading(false);
-      } catch (err) {
-        console.error("Fallo al conectar con Open Data BCN", err);
-        setLoading(false);
-      }
+        const res = await fetch('https://opendata-ajuntament.barcelona.cat/data/api/3/action/datastore_search?resource_id=e7041793-6c8c-4f10-9080-33b09228a0f9&limit=100');
+        const data = await res.json();
+        const records = data.result.records.map(r => ({
+          id: r._id,
+          name: r.name,
+          lat: parseFloat(r.lat),
+          lng: parseFloat(r.lon),
+          info: r.description,
+          url: r.p_inf_esp_web
+        })).filter(r => !isNaN(r.lat));
+        setEventos(records);
+      } catch (e) { console.error("Error cargando el pulso de la ciudad", e); }
     };
-
-    fetchLiveEvents();
-    // Consultar cada 5 minutos para mantener la "vida" de la app
-    const interval = setInterval(fetchLiveEvents, 300000);
-    return () => clearInterval(interval);
+    fetchBarnaData();
   }, []);
 
   return (
     <div className="h-full w-full absolute inset-0">
-      {loading && (
-        <div className="absolute inset-0 z-[500] bg-gray-900/60 flex items-center justify-center backdrop-blur-sm">
-          <div className="text-white font-bold animate-pulse">Sincronizando con Barcelona Open Data...</div>
-        </div>
-      )}
-      <MapContainer 
-        center={[41.3851, 2.1734]} 
-        zoom={13} 
-        style={{ height: '100%', width: '100%' }}
-        zoomControl={false}
-      >
+      <MapContainer center={[41.3851, 2.1734]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-        
         {eventos.map(ev => (
-          <Marker key={ev.id} position={[ev.lat, ev.lng]} icon={getIcon(ev.tipo)}>
-            <Popup className="custom-popup">
-              <div className="p-1">
-                <h3 className="font-bold text-gray-900 leading-tight">{ev.titulo}</h3>
-                <p className="text-[10px] text-blue-600 font-bold uppercase mt-1">{ev.tipo}</p>
-                <div className="mt-2 text-[11px] text-gray-600 line-clamp-3" dangerouslySetInnerHTML={{ __html: ev.descripcion }} />
+          <Marker key={ev.id} position={[ev.lat, ev.lng]} icon={getIcon('#3B82F6')}>
+            <Popup>
+              <div className="p-1 font-sans">
+                <h3 className="font-bold text-sm">{ev.name}</h3>
+                <p className="text-[10px] my-2 text-gray-600 line-clamp-3" dangerouslySetInnerHTML={{__html: ev.info}}></p>
+                <a href={ev.url} target="_blank" className="text-blue-500 text-[10px] font-bold underline">Más info</a>
               </div>
             </Popup>
           </Marker>
