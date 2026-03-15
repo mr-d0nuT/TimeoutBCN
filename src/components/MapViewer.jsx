@@ -8,15 +8,10 @@ export default function MapViewer() {
   const [eventos, setEventos] = useState([]);
 
   useEffect(() => {
-    // Icono estándar para evitar errores de carga de imágenes
-    const blueIcon = L.divIcon({
-      html: `<div style="background:#3B82F6;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.5);"></div>`,
-      className: 'custom'
-    });
-
-    const fetchBarnaData = async () => {
+    const fetchAgendaHoy = async () => {
       try {
-        const res = await fetch('https://opendata-ajuntament.barcelona.cat/data/api/3/action/datastore_search?resource_id=e7041793-6c8c-4f10-9080-33b09228a0f9&limit=50');
+        // Consultamos la API de la Guía de Barcelona para los eventos de HOY
+        const res = await fetch('https://opendata-ajuntament.barcelona.cat/data/api/3/action/datastore_search?resource_id=e7041793-6c8c-4f10-9080-33b09228a0f9&limit=100');
         const data = await res.json();
         const records = data.result.records
           .filter(r => r.lat && r.lon)
@@ -24,24 +19,41 @@ export default function MapViewer() {
             id: r._id,
             name: r.name,
             pos: [parseFloat(r.lat), parseFloat(r.lon)],
-            info: r.description
+            info: r.description,
+            hora: r.prox_ses_horari || "Ver guía"
           }));
         setEventos(records);
-      } catch (e) { console.error("Error API", e); }
+      } catch (e) {
+        console.error("Error conectando con Guía BCN", e);
+      }
     };
-    fetchBarnaData();
+    fetchAgendaHoy();
   }, []);
 
   return (
-    <div style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}>
-      <MapContainer center={[41.3851, 2.1734]} zoom={13} style={{ height: '100%', width: '100%' }}>
+    <div style={{ height: '100vh', width: '100vw' }}>
+      <MapContainer 
+        center={[41.387, 2.170]} 
+        zoom={13} 
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={false}
+      >
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+        
         {eventos.map(ev => (
-          <Marker key={ev.id} position={ev.pos} icon={L.divIcon({html: '<div style="background:#3B82F6;width:12px;height:12px;border-radius:50%;border:2px solid white;"></div>'})}>
+          <Marker 
+            key={ev.id} 
+            position={ev.pos} 
+            icon={L.divIcon({
+              html: `<div style="background:#2563eb;width:10px;height:10px;border-radius:50%;border:2px solid white;"></div>`,
+              className: 'event-marker'
+            })}
+          >
             <Popup>
-              <div className="text-gray-900 font-sans">
-                <h3 className="font-bold">{ev.name}</h3>
-                <div className="text-[10px] mt-1" dangerouslySetInnerHTML={{__html: ev.info}}></div>
+              <div style={{ fontFamily: 'sans-serif', fontSize: '12px' }}>
+                <h3 style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>{ev.name}</h3>
+                <p style={{ margin: '0', color: '#666' }}>{ev.hora}</p>
+                <a href={`http://guia.barcelona.cat/ca/detall/_${ev.id}`} target="_blank" style={{ color: '#2563eb', textDecoration: 'none', fontSize: '10px', fontWeight: 'bold' }}>VER EN GUIA.BARCELONA.CAT</a>
               </div>
             </Popup>
           </Marker>
