@@ -7,43 +7,41 @@ import L from 'leaflet';
 export default function MapViewer() {
   const [eventos, setEventos] = useState([]);
 
-  // Iconos por categoría
-  const getIcon = (color) => L.divIcon({
-    html: `<div style="background-color: ${color}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.4);"></div>`,
-    className: 'custom-marker'
-  });
-
   useEffect(() => {
-    // API REAL: Agenda Cultural de Barcelona (Open Data)
+    // Icono estándar para evitar errores de carga de imágenes
+    const blueIcon = L.divIcon({
+      html: `<div style="background:#3B82F6;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 5px rgba(0,0,0,0.5);"></div>`,
+      className: 'custom'
+    });
+
     const fetchBarnaData = async () => {
       try {
-        const res = await fetch('https://opendata-ajuntament.barcelona.cat/data/api/3/action/datastore_search?resource_id=e7041793-6c8c-4f10-9080-33b09228a0f9&limit=100');
+        const res = await fetch('https://opendata-ajuntament.barcelona.cat/data/api/3/action/datastore_search?resource_id=e7041793-6c8c-4f10-9080-33b09228a0f9&limit=50');
         const data = await res.json();
-        const records = data.result.records.map(r => ({
-          id: r._id,
-          name: r.name,
-          lat: parseFloat(r.lat),
-          lng: parseFloat(r.lon),
-          info: r.description,
-          url: r.p_inf_esp_web
-        })).filter(r => !isNaN(r.lat));
+        const records = data.result.records
+          .filter(r => r.lat && r.lon)
+          .map(r => ({
+            id: r._id,
+            name: r.name,
+            pos: [parseFloat(r.lat), parseFloat(r.lon)],
+            info: r.description
+          }));
         setEventos(records);
-      } catch (e) { console.error("Error cargando el pulso de la ciudad", e); }
+      } catch (e) { console.error("Error API", e); }
     };
     fetchBarnaData();
   }, []);
 
   return (
-    <div className="h-full w-full absolute inset-0">
-      <MapContainer center={[41.3851, 2.1734]} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+    <div style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}>
+      <MapContainer center={[41.3851, 2.1734]} zoom={13} style={{ height: '100%', width: '100%' }}>
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
         {eventos.map(ev => (
-          <Marker key={ev.id} position={[ev.lat, ev.lng]} icon={getIcon('#3B82F6')}>
+          <Marker key={ev.id} position={ev.pos} icon={L.divIcon({html: '<div style="background:#3B82F6;width:12px;height:12px;border-radius:50%;border:2px solid white;"></div>'})}>
             <Popup>
-              <div className="p-1 font-sans">
-                <h3 className="font-bold text-sm">{ev.name}</h3>
-                <p className="text-[10px] my-2 text-gray-600 line-clamp-3" dangerouslySetInnerHTML={{__html: ev.info}}></p>
-                <a href={ev.url} target="_blank" className="text-blue-500 text-[10px] font-bold underline">Más info</a>
+              <div className="text-gray-900 font-sans">
+                <h3 className="font-bold">{ev.name}</h3>
+                <div className="text-[10px] mt-1" dangerouslySetInnerHTML={{__html: ev.info}}></div>
               </div>
             </Popup>
           </Marker>
