@@ -1,102 +1,70 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Camera, WifiOff, Activity, ShieldAlert, X } from 'lucide-react';
+import { Camera, Activity, ShieldAlert, X } from 'lucide-react';
 
-const MapViewer = dynamic(() => import('../components/MapViewer'), { ssr: false });
+const MapViewer = dynamic(() => import('../components/MapViewer'), { 
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-gray-800 animate-pulse flex items-center justify-center">Cargando Mapa...</div>
+});
 
 export default function BarnaPulseCore() {
-  const [modoARActivo, setModoARActivo] = useState(false);
+  const [modoAR, setModoAR] = useState(false);
   const videoRef = useRef(null);
 
-  // Intentar activar la cámara ignorando comprobaciones previas
-  const activarCamara = async () => {
+  const encenderCamara = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', // Intenta la trasera en móviles
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        } 
+        video: { facingMode: 'environment' } 
       });
-      
-      setModoARActivo(true);
-      
-      // Esperar un milisegundo a que el elemento <video> aparezca en el DOM
+      setModoAR(true);
       setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      }, 300);
-
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      }, 200);
     } catch (err) {
-      console.error("Error de acceso:", err);
-      alert("Error de Cámara: " + err.name + ". Asegúrate de dar permiso en el aviso del navegador.");
+      alert("Error de cámara: " + err.message);
     }
   };
 
-  const desactivarCamara = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+  const apagarCamara = () => {
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
     }
-    setModoARActivo(false);
+    setModoAR(false);
   };
 
   return (
-    <main className="h-screen w-screen flex flex-col md:flex-row bg-gray-900 relative overflow-hidden">
-      
-      {/* CAPA BASE: MAPA O VÍDEO */}
-      <div className="absolute inset-0 z-0 bg-black">
-        {modoARActivo ? (
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            muted 
-            className="w-full h-full object-cover"
-          />
+    <main className="fixed inset-0 bg-black overflow-hidden flex flex-col md:flex-row">
+      {/* VISOR PRINCIPAL */}
+      <div className="relative flex-grow h-full bg-gray-900">
+        {modoAR ? (
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
         ) : (
           <MapViewer />
         )}
       </div>
 
-      {/* PANEL DE INTERFAZ */}
-      <div className="z-10 w-full md:w-96 p-6 flex flex-col bg-gray-900/80 backdrop-blur-xl border-r border-gray-800 shadow-2xl">
-        
-        <header className="mb-8">
-          <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
-            BarnaPulse
-          </h1>
-          <div className="flex items-center gap-2 bg-emerald-900/50 text-emerald-400 px-3 py-2 rounded-lg text-sm font-bold border border-emerald-800/50">
-            <Activity size={18} /> Sistema Activo
+      {/* PANEL DE CONTROL */}
+      <div className="absolute bottom-0 left-0 w-full md:relative md:w-96 bg-gray-900/90 backdrop-blur-xl p-6 border-t md:border-t-0 md:border-r border-gray-800 z-[1000] shadow-2xl">
+        <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 mb-6">
+          BarnaPulse
+        </h1>
+
+        <button 
+          onClick={modoAR ? apagarCamara : encenderCamara}
+          className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all mb-6 ${
+            modoAR ? 'bg-red-600 text-white' : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+          }`}
+        >
+          {modoAR ? <><X /> Ver Mapa</> : <><Camera /> Activar BarnaLens</>}
+        </button>
+
+        <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+          <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase mb-2">
+            <Activity size={14} /> Sistema en Vivo
           </div>
-        </header>
-
-        {/* BOTÓN DE ACCIÓN ÚNICO */}
-        <section className="mb-6">
-          {!modoARActivo ? (
-            <button 
-              onClick={activarCamara}
-              className="w-full py-4 rounded-xl font-bold flex justify-center items-center gap-3 bg-blue-600 hover:bg-blue-500 shadow-lg text-white transition-all"
-            >
-              <Camera size={22} /> Activar BarnaLens (AR)
-            </button>
-          ) : (
-            <button 
-              onClick={desactivarCamara}
-              className="w-full py-4 rounded-xl font-bold flex justify-center items-center gap-3 bg-red-600 hover:bg-red-500 shadow-lg text-white transition-all"
-            >
-              <X size={22} /> Cerrar BarnaLens
-            </button>
-          )}
-        </section>
-
-        {/* INDICADOR DE ESTADO IA */}
-        <section className="bg-gray-800/50 rounded-xl p-5 border border-gray-700 mt-auto">
-          <h2 className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-3">🔮 Análisis IA</h2>
-          <h3 className="text-lg font-bold text-white mb-1">Barcelona En Vivo</h3>
-          <p className="text-sm text-gray-300">Explora el mapa o usa la cámara para ver eventos cercanos.</p>
-        </section>
+          <p className="text-gray-300 text-sm">Explora los eventos gratuitos en el mapa o usa la cámara para escanear tu entorno.</p>
+        </div>
       </div>
     </main>
   );
